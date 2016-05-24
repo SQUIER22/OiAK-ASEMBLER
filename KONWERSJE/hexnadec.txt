@@ -1,0 +1,136 @@
+.code32
+
+SYSEXIT = 1
+SYSREAD = 3
+SYSWRITE = 4
+STDOUT = 1
+EXIT_SUCCESS = 0
+
+
+.bss
+.comm text, 512
+.comm buffor, 512
+
+.data
+hexvalues: .long 0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0,0,10,11,12,13,14,15 
+hexpowers: .long 1, 16, 256, 4096, 65536, 1048576, 16777216, 268435456
+licznik: .long 0
+	
+.text
+	msg: .ascii "Podaj ciag znakow "
+	msg_len = . - msg
+
+.global _start  
+
+_start:
+	movl $SYSWRITE, %eax       #wyswietlanie
+	movl $STDOUT, %ebx      
+	movl $msg, %ecx  
+	movl $msg_len, %edx 
+	int  $0x80    
+	
+
+	movl $SYSREAD, %eax  #czytanie stdin
+	movl $EXIT_SUCCESS, %ebx 
+	movl $buffor, %ecx 
+	movl $512,%edx  
+	int  $0x80 
+	
+	movl $0, %ebx
+
+	movl %eax, %edi	
+	dec %edi	#ilosc wpisanych cyfr bez znaku \0
+	movl $0, %edx	
+	petla:
+		dec %edi
+		movl $0, %eax
+		movb buffor(,%edi,1), %al	#znak w eax
+		sub $48, %al	#wskaznik na wartosc znaku
+		movl %eax, %esi	
+		movl hexvalues(,%esi,4),%eax #wartosc w eax
+		movl hexpowers(,%edx,4),%ecx	#potega 
+		imull %ecx,%eax		#eax=eax*ecx
+		addl %eax,%ebx		#wynik w ebx
+		inc %edx
+		cmpl $0, %edi
+	je koniec_petli
+	jmp petla
+
+	koniec_petli:	
+	pushl %ebx
+	pushl $0
+	
+	call decode	#zwraca ilosc znakow w ebx
+	
+	movl    $0, %edi    #licznik "od przodu"
+	movl 	%ebx, %edx	#ilosc cyfr
+        dec     %edx        #po odjeciu 1 staje sie licznikiem "od konca"
+        jmp     loop        #wejscie do petli odwracajacej napis
+
+        
+        #%al przechowuje pierwszy znak (indeks w %edi), %ah ostatni (indeks w %edx). I nastêpuje zamiana.
+        #Jak wskaŸniki siê "przetn¹", koniec pêtli.
+        loop:
+                movb    text(,%edi,1), %al #wczytywanie znakow od poczatku
+                movb    text(,%edx,1), %ah #wczytywanie znakow od konca
+                movb    %al, text(,%edx,1) #zamiana
+                movb    %ah, text(,%edi,1)
+                inc     %edi
+
+                cmp     %edx, %edi         #warunek konca: jesli wskaznik na poczatek bedzie rowny badz wiekszy niz wskaznik na koniec ->koniec
+                jge     end                #napis odwrocony
+                dec     %edx               #zmniejszenie licznika konca
+                jmp     loop               #powtorzenie operacji
+
+        end:
+	
+	movl $SYSWRITE, %eax
+	movl $STDOUT, %ebx
+	movl $text, %ecx
+	movl $512, %edx
+	int $0x80
+
+	mov $SYSEXIT, %eax
+	mov $EXIT_SUCCESS,%ebx 
+	int  $0x80 
+
+	#funkcja zamieniajaca liczbe typu long na napis
+#potrzebne zmienne
+#indeks do miejsca w etykiecie 'text' gdzie bedzie rozpoczete zapisywanie znaku
+#liczba do zdekodowania
+#
+#wynik zostanie wpisany do etykiety 'text'
+#
+#zmienne:
+#       eax trzyma liczbe do zdekodowania
+#       ecx trzyma baze systemu czyli 10
+#       edx trzyma reszte z dzielenia eax/ebx
+#       edi trzyma indeks/ miejsce dla zdekodowanej cyfry
+.type decode, @function
+decode:
+        pushl %ebp      #zachowanie starego base pointera
+        movl %esp, %ebp #stack pointer na base pointer
+        subl $4, %esp   #miejsce dla localnych zmiennych
+
+        movl 8(%ebp), %edi      #wczytanie indeksu
+        movl 12(%ebp), %eax     #wczytanie liczby do zdekodowania
+
+        #inicjalizacja zmiennyc
+        movl $10, %ecx
+        movl $0, %edx
+	movl $0, %ebx
+        znak:
+		inc %ebx
+                idivl %ecx      #dzielenie eax/ecx
+                addl $0x30, %edx        #uzyskanie wartosci ascii
+                movb %dl, text(,%edi,1) #zachowanie znaku
+                incl %edi       #kolejny znak
+                cmpl $0, %eax   #sprawdzenie czy koniec
+                je koniec
+                movl $0, %edx   #wyzerowanie edx
+                jmp znak        #powtorzenie operacji
+
+        koniec:
+        movl %ebp, %esp #odzyskanie stack pointera
+        popl %ebp       #odzyskanie basepointera
+        ret

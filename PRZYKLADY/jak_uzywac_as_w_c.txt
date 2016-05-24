@@ -1,0 +1,47 @@
+.code32
+
+
+.text
+.global dodaj
+.type dodaj, @function
+
+dodaj:
+        pushl %ebp		
+        movl %esp, %ebp
+        movl 8(%esp), %eax      #pierwszy argument do eax'a
+        addl 12(%esp), %eax     #dodanie drugiego argumentu do eax'a
+        popl %ebp
+        ret
+
+##koniec pliku dodaj.s
+
+##poczatek pliku test.c
+
+#include <stdio.h>
+
+extern int dodaj(int a, int b); //funkcja assemblera
+
+int main() {
+
+	printf("2+3=%d\n", dodaj(2,3));
+
+	return 0;
+}
+
+
+##koniec pliku test.c
+
+
+Jak to w³¹czyæ?!
+
+asemblacja(?) pliku dodaj.s:
+	as -32 -q -o dodaj.o dodaj.s
+
+kompilacja pliku test.c
+	gcc test.c -m32 -c -o test.o
+
+i linkowanie:
+	gcc test.o dodaj.o -m32 -o sumuj
+
+po wszystkim, mo¿na uruchomiæ za pomoc¹:
+	./sumuj

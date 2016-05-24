@@ -1,0 +1,41 @@
+LISTSIZE = 13
+
+#This simple program searchs for minimum in list
+#%eax register stores next list element
+#%ebx register stores current minimum value
+#%edi register is used as index
+
+.data
+#label where the list starts, holds 13 elements each 4 bytes long
+lista:
+.long 54,67,34,222,45,75,254,34,44,33,22,66,223
+
+.text
+
+.global _start
+
+        _start:
+        mov $0, %edi            #moves 0 to index register, list beginning
+        mov lista(,%edi,4), %eax        #loads the first (4)byte of data
+        mov %eax, %ebx          #move first value to ebx as min value
+
+        loop:
+                inc %edi                #increment index register
+                cmp $LISTSIZE, %edi     #if index register meets list size, than finish
+        je exit_loop
+
+                #else read next value and compare with current min
+                mov lista(,%edi,4), %eax        #moves next list element to eax
+                cmp %ebx, %eax          #compares current min with just loaded value
+        jge loop                #if eax is greater than current value, read next value
+
+                #else save new value as current minimum
+                mov %eax, %ebx          #moves eax value to ebx register
+        jmp loop                #reads next value
+
+        #exiting programm
+        exit_loop:
+        #%ebx is the status code for system exit, and it already stores the min value
+        #i will use it as function return value, after running program i can check minimum running "echo $?"
+        mov $1, %eax    #system exit
+        int $0x80

@@ -1,0 +1,84 @@
+.code32
+
+syswrite = 4
+stdout = 1
+exit = 1
+exitsucc = 0
+
+#miejsce na tekst
+.bss
+.comm text, 512
+
+#wartosci do wypisania
+.data
+hexvalues: .long 2000, 300, 45
+
+#spacja
+.text
+space: .ascii "_"
+space_len = . - space
+
+.global _start
+
+_start:
+        movl $0, %edi
+
+        movl hexvalues(,%edi,4), %eax
+
+        pushl %eax
+        push $0
+
+        call decode
+        addl $8, %esp
+
+        movl $syswrite, %eax
+        movl $stdout, %ebx
+        movl $text, %ecx
+        movl $512, %edx
+        int $0x80
+
+        movl $exit, %eax
+        movl $exitsucc, %ebx
+        int $0x80
+
+
+#funkcja zamieniajaca liczbe typu long na napis
+#potrzebne zmienne
+#indeks do miejsca w etykiecie 'text' gdzie bedzie rozpoczete zapisywanie znaku
+#liczba do zdekodowania
+#
+#wynik zostanie wpisany do etykiety 'text'
+#
+#zmienne:
+#       eax trzyma liczbe do zdekodowania
+#       ebx trzyma baze systemu czyli 10
+#       edx trzyma reszte z dzielenia eax/ebx
+#       edi trzyma indeks/ miejsce dla zdekodowanej cyfry
+.type decode, @function
+decode:
+        pushl %ebp      #zachowanie starego base pointera
+        movl %esp, %ebp #stack pointer na base pointer
+        subl $4, %esp   #miejsce dla localnych zmiennych
+
+        movl 8(%ebp), %edi      #wczytanie indeksu
+        movl 12(%ebp), %eax     #wczytanie liczby do zdekodowania
+
+        #inicjalizacja zmiennyc
+        movl $10, %ebx
+        movl $0, %edx
+        znak:
+                idivl %ebx      #dzielenie eax/ebx
+                addl $0x30, %edx        #uzyskanie wartosci ascii
+                movb %dl, text(,%edi,1) #zachowanie znaku
+                incl %edi       #kolejny znak
+                cmpl $0, %eax   #sprawdzenie czy koniec
+                je koniec
+                movl $0, %edx   #wyzerowanie edx
+                jmp znak        #powtorzenie operacji
+
+        koniec:
+        movl %ebp, %esp #odzyskanie stack pointera
+        popl %ebp       #odzyskanie basepointera
+        ret
+
+
